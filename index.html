@@ -14,16 +14,19 @@
       min-height: 100vh;
       padding: 16px;
     }
+
     .card {
       width: 100%;
-      max-width: 420px;
+      max-width: 520px;
       background: #fff;
       border-radius: 16px;
       padding: 22px;
       box-shadow: 0 10px 30px rgba(0,0,0,.08);
     }
+
     h1 { margin: 0 0 8px; font-size: 24px; }
     p { margin: 0 0 16px; color: #666; }
+
     input {
       width: 100%;
       box-sizing: border-box;
@@ -33,6 +36,7 @@
       font-size: 16px;
       margin-bottom: 12px;
     }
+
     button {
       width: 100%;
       border: none;
@@ -44,14 +48,28 @@
       background: #2563eb;
       color: white;
     }
-    button:disabled { opacity: .6; cursor: not-allowed; }
+
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
     .msg {
       margin-top: 12px;
       font-size: 14px;
       min-height: 18px;
     }
+
     .ok { color: #15803d; }
     .err { color: #b91c1c; }
+    .muted { color: #666; font-size: 12px; margin-top: 8px; }
+
+    .small {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -62,31 +80,36 @@
     <form id="form">
       <input
         id="fullName"
+        name="fullName"
         type="text"
         placeholder="Прізвище Ім'я По батькові"
         required
         minlength="5"
         maxlength="120"
+        autocomplete="name"
       />
+
       <button id="submitBtn" type="submit">Взяти участь у розіграші</button>
       <div id="msg" class="msg"></div>
+      <div class="small">Одна заявка = один учасник. Повторні ПІБ не додаються.</div>
     </form>
   </div>
 
   <script>
+    // ВСТАВ СЮДИ свій Apps Script Web App URL (deployment /exec)
     const API_URL = "https://script.google.com/macros/s/AKfycbwiszTYz1UUUqRnKM8evP6TVgaZ1AFkhe8IzNElhrNvFTcr2fB9ITp0-UCd0XoRSnug/exec";
 
-    const form = document.getElementById('form');
-    const fullNameInput = document.getElementById('fullName');
-    const submitBtn = document.getElementById('submitBtn');
-    const msg = document.getElementById('msg');
+    const form = document.getElementById("form");
+    const fullNameInput = document.getElementById("fullName");
+    const submitBtn = document.getElementById("submitBtn");
+    const msg = document.getElementById("msg");
 
-    function setMessage(text, type = '') {
+    function setMessage(text, type = "") {
       msg.textContent = text;
-      msg.className = 'msg ' + (type || '');
+      msg.className = "msg " + (type || "");
     }
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const fullName = fullNameInput.value.trim();
@@ -100,13 +123,16 @@
       setMessage("Надсилаємо...");
 
       try {
+        // ВАЖЛИВО: НЕ JSON, а form-urlencoded (через URLSearchParams)
+        const body = new URLSearchParams();
+        body.append("fullName", fullName);
+
         const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullName }),
-          redirect: 'follow'
+          method: "POST",
+          body
         });
 
+        // Якщо API повернув не JSON, тут впаде — і ми побачимо помилку в console
         const data = await res.json();
 
         if (data.ok) {
@@ -116,6 +142,7 @@
           setMessage(data.message || "Не вдалося надіслати заявку", "err");
         }
       } catch (error) {
+        console.error("Submit error:", error);
         setMessage("Помилка з'єднання. Спробуйте ще раз.", "err");
       } finally {
         submitBtn.disabled = false;
