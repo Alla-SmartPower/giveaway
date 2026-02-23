@@ -1,51 +1,126 @@
-function doPost(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sheet1');
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Участь у розіграші</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 16px; color: #666; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border: 1px solid #d5d9e2;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+    }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .msg {
+      margin-top: 12px;
+      font-size: 14px;
+      min-height: 18px;
+    }
+    .ok { color: #15803d; }
+    .err { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎉 Розіграш</h1>
+    <p>Введіть ПІБ та натисніть кнопку, щоб взяти участь.</p>
 
-    const data = JSON.parse(e.postData.contents || '{}');
-    const fullName = (data.fullName || '').trim();
+    <form id="form">
+      <input
+        id="fullName"
+        type="text"
+        placeholder="Прізвище Ім'я По батькові"
+        required
+        minlength="5"
+        maxlength="120"
+      />
+      <button id="submitBtn" type="submit">Взяти участь у розіграші</button>
+      <div id="msg" class="msg"></div>
+    </form>
+  </div>
 
-    if (!fullName) {
-      return jsonResponse({ ok: false, message: 'Вкажіть ПІБ' });
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwiszTYz1UUUqRnKM8evP6TVgaZ1AFkhe8IzNElhrNvFTcr2fB9ITp0-UCd0XoRSnug/exec";
+
+    const form = document.getElementById('form');
+    const fullNameInput = document.getElementById('fullName');
+    const submitBtn = document.getElementById('submitBtn');
+    const msg = document.getElementById('msg');
+
+    function setMessage(text, type = '') {
+      msg.textContent = text;
+      msg.className = 'msg ' + (type || '');
     }
 
-    if (fullName.length < 5 || fullName.length > 120) {
-      return jsonResponse({ ok: false, message: 'Некоректне ПІБ' });
-    }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    const normalized = normalizeName(fullName);
+      const fullName = fullNameInput.value.trim();
 
-    const lastRow = sheet.getLastRow();
-    if (lastRow >= 2) {
-      const existing = sheet.getRange(2, 3, lastRow - 1, 1).getValues().flat();
-      if (existing.includes(normalized)) {
-        return jsonResponse({ ok: false, message: 'Такий учасник вже зареєстрований' });
+      if (!fullName) {
+        setMessage("Будь ласка, введіть ПІБ", "err");
+        return;
       }
-    }
 
-    sheet.appendRow([new Date(), fullName, normalized, 'accepted']);
+      submitBtn.disabled = true;
+      setMessage("Надсилаємо...");
 
-    return jsonResponse({ ok: true, message: 'Заявку прийнято ✅' });
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName }),
+          redirect: 'follow'
+        });
 
-  } catch (err) {
-    return jsonResponse({ ok: false, message: 'Помилка сервера', error: String(err) });
-  }
-}
+        const data = await res.json();
 
-function doGet() {
-  return jsonResponse({ ok: true, message: 'API працює' });
-}
-
-function normalizeName(name) {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[’'`]/g, "'")
-    .trim();
-}
-
-function jsonResponse(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+        if (data.ok) {
+          setMessage(data.message || "Заявку прийнято ✅", "ok");
+          form.reset();
+        } else {
+          setMessage(data.message || "Не вдалося надіслати заявку", "err");
+        }
+      } catch (error) {
+        setMessage("Помилка з'єднання. Спробуйте ще раз.", "err");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
