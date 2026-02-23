@@ -14,7 +14,6 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const fullName = fullNameInput.value.trim();
-
   if (!fullName) {
     setMessage("Будь ласка, введіть ПІБ", "err");
     return;
@@ -40,6 +39,7 @@ form.addEventListener("submit", async (e) => {
     } else {
       const details = data.error ? ` (${data.error})` : "";
       setMessage((data.message || "Не вдалося надіслати заявку") + details, "err");
+      console.error("API error:", data);
     }
   } catch (error) {
     console.error("Submit error:", error);
