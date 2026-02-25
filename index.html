@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Участь у розіграші</title>
+  <title>Розіграш</title>
   <style>
     body {
       margin: 0;
@@ -24,7 +24,6 @@
     }
     h1 { margin: 0 0 8px; font-size: 24px; }
     p { margin: 0 0 16px; color: #666; }
-
     input {
       width: 100%;
       box-sizing: border-box;
@@ -34,7 +33,6 @@
       font-size: 16px;
       margin-bottom: 12px;
     }
-
     button {
       width: 100%;
       border: none;
@@ -47,22 +45,10 @@
       color: white;
     }
     button:disabled { opacity: .6; cursor: not-allowed; }
-
     .msg { margin-top: 12px; font-size: 14px; min-height: 18px; }
     .ok { color: #15803d; }
     .err { color: #b91c1c; }
-    .small { margin-top: 8px; font-size: 12px; color: #666; }
-
-    /* honeypot */
-    .hidden {
-      display: none !important;
-      visibility: hidden;
-      opacity: 0;
-      height: 0;
-      overflow: hidden;
-      position: absolute;
-      left: -9999px;
-    }
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -71,19 +57,11 @@
     <p>Введіть ПІБ та натисніть кнопку, щоб взяти участь.</p>
 
     <form id="form">
-      <!-- REQUIRED для Web3Forms -->
-      <input type="hidden" name="access_key" value="e918b41b-af00-4da6-b74f-d84f518d4c30" />
+      <input type="hidden" name="access_key" value="e918b41b-af00-4da6-b74f-d84f518d4c30">
+      <input type="hidden" name="subject" value="Нова заявка на розіграш">
+      <input type="hidden" name="from_name" value="Розіграш">
+      <input type="checkbox" name="botcheck" class="hidden" tabindex="-1" autocomplete="off">
 
-      <!-- Опціонально: тема листа -->
-      <input type="hidden" name="subject" value="Нова заявка на розіграш" />
-
-      <!-- Опціонально: назва відправника -->
-      <input type="hidden" name="from_name" value="Розіграш" />
-
-      <!-- Anti-spam honeypot (Web3Forms рекомендує botcheck) -->
-      <input type="checkbox" name="botcheck" class="hidden" tabindex="-1" autocomplete="off" />
-
-      <!-- Наше поле -->
       <input
         id="fullName"
         name="fullName"
@@ -92,20 +70,16 @@
         required
         minlength="3"
         maxlength="120"
-        autocomplete="name"
       />
 
       <button id="submitBtn" type="submit">Взяти участь у розіграші</button>
       <div id="msg" class="msg"></div>
-      <div class="small">Одна заявка = один учасник.</div>
     </form>
   </div>
 
   <script>
     const API_URL = "https://api.web3forms.com/submit";
-
     const form = document.getElementById("form");
-    const fullNameInput = document.getElementById("fullName");
     const submitBtn = document.getElementById("submitBtn");
     const msg = document.getElementById("msg");
 
@@ -114,83 +88,37 @@
       msg.className = "msg " + type;
     }
 
-    function normalizeName(name) {
-      return String(name)
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .replace(/[’'`]/g, "'")
-        .trim();
-    }
-
-    // Простий антидубль в одному браузері (localStorage)
-    function wasSubmittedBefore(normalizedName) {
-      try {
-        const key = "giveaway_submitted_names";
-        const arr = JSON.parse(localStorage.getItem(key) || "[]");
-        return arr.includes(normalizedName);
-      } catch {
-        return false;
-      }
-    }
-
-    function markSubmitted(normalizedName) {
-      try {
-        const key = "giveaway_submitted_names";
-        const arr = JSON.parse(localStorage.getItem(key) || "[]");
-        if (!arr.includes(normalizedName)) {
-          arr.push(normalizedName);
-          localStorage.setItem(key, JSON.stringify(arr));
-        }
-      } catch {}
-    }
-
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-
-      const fullName = fullNameInput.value.trim();
-      if (!fullName) {
-        setMessage("Будь ласка, введіть ПІБ", "err");
-        return;
-      }
-
-      const normalized = normalizeName(fullName);
-
-      if (wasSubmittedBefore(normalized)) {
-        setMessage("Схоже, це ПІБ вже надсилали з цього браузера.", "err");
-        return;
-      }
 
       submitBtn.disabled = true;
       setMessage("Надсилаємо...");
 
       try {
-        // Web3Forms accepts multipart/form-data via FormData
         const formData = new FormData(form);
-
-        // Додаємо технічне поле для зручності в листі / експорті
-        formData.append("normalized_name", normalized);
 
         const res = await fetch(API_URL, {
           method: "POST",
-          body: formData,
-          headers: {
-            "Accept": "application/json"
-          }
+          headers: { "Accept": "application/json" },
+          body: formData
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { success: false, message: "Невалідна відповідь сервера", raw: text };
+        }
+
+        console.log("Web3Forms status:", res.status);
+        console.log("Web3Forms response:", data);
 
         if (res.ok && data.success) {
-          markSubmitted(normalized);
           setMessage("Заявку прийнято ✅", "ok");
           form.reset();
         } else {
-          const errText =
-            data?.message ||
-            data?.errors?.[0]?.message ||
-            "Не вдалося надіслати заявку";
-          setMessage(errText, "err");
-          console.error("Web3Forms error:", data);
+          setMessage(data.message || `Помилка (${res.status})`, "err");
         }
       } catch (err) {
         console.error("Submit error:", err);
